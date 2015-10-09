@@ -26,20 +26,29 @@ function comment_notify_install() {
 
   // Set module weight low so that other modules act on the comment first.
   db_insert('comment_notify')->from($comments_select)->execute();
-  db_update('system')->
-    fields(array(
-    'weight' => 10
-    ))
-    ->condition('name', 'comment_notify');
+  // @FIXME
+// db_update('system')->
+//     fields(array(
+//     'weight' => 10
+//     ))
+//     ->condition('name', 'comment_notify');
+
 }
 
 /**
  * Implements hook_uninstall().
  */
 function comment_notify_uninstall() {
-  variable_del('node_notify_default_mailtext');
-  db_delete('variable')
+  // @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// variable_del('node_notify_default_mailtext');
+
+  // @FIXME
+// db_delete('variable')
     ->where('name', "comment_notify_%", 'LIKE');
+
 }
 
 /**
@@ -139,23 +148,28 @@ function comment_notify_update_7003() {
   foreach ($variables as $variable => $context) {
     // If the variable is using the default value, this will return NULL and we
     // can skip it.
-    if ($text = variable_get($variable)) {
-      $replacements = array(
-        '[comment:unsubscribe-url]' => '[comment-subscribed:unsubscribe-url]',
-        '[comment:name]' => '[comment:author]',
-        '[node:' => '[comment:node:', // Replace all node tokens with comment:node.
-      );
-      if ($context == 'author') {
-        $replacements['[user:name]'] = '[comment:node:author]';
-        $replacements['[user:'] = '[comment:node:author:';
-      }
-      elseif ($context == 'commenter') {
-        $replacements['[user:name]'] = '[comment-subscribed:author]';
-        $replacements['[user:'] = '[comment-subscribed:author:';
-      }
-      $text = strtr($text, $replacements);
-      variable_set($variable, $text);
-    }
+    // @FIXME
+// // @FIXME
+// // The correct configuration object could not be determined. You'll need to
+// // rewrite this call manually.
+// if ($text = variable_get($variable)) {
+//       $replacements = array(
+//         '[comment:unsubscribe-url]' => '[comment-subscribed:unsubscribe-url]',
+//         '[comment:name]' => '[comment:author]',
+//         '[node:' => '[comment:node:', // Replace all node tokens with comment:node.
+//       );
+//       if ($context == 'author') {
+//         $replacements['[user:name]'] = '[comment:node:author]';
+//         $replacements['[user:'] = '[comment:node:author:';
+//       }
+//       elseif ($context == 'commenter') {
+//         $replacements['[user:name]'] = '[comment-subscribed:author]';
+//         $replacements['[user:'] = '[comment-subscribed:author:';
+//       }
+//       $text = strtr($text, $replacements);
+//       variable_set($variable, $text);
+//     }
+
   }
   return 'Comment Notify token strings updated.';
 }

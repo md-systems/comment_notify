@@ -62,12 +62,28 @@ function comment_notify_init() {
   // everywhere than force a second file on some pages.
   $options = array('every_page' => TRUE);
   $path = drupal_get_path('module', 'comment_notify');
-  drupal_add_css($path . '/comment_notify.css', $options);
+  // @FIXME
+// The Assets API has totally changed. CSS, JavaScript, and libraries are now
+// attached directly to render arrays using the #attached property.
+// 
+// 
+// @see https://www.drupal.org/node/2169605
+// @see https://www.drupal.org/node/2408597
+// drupal_add_css($path . '/comment_notify.css', $options);
+
 
   // We only add the JS if more than one subscription mode is enabled.
   $available_options = _comment_notify_options();
   if (count($available_options) > 1) {
-    drupal_add_js($path . '/comment_notify.js', $options);
+    // @FIXME
+// The Assets API has totally changed. CSS, JavaScript, and libraries are now
+// attached directly to render arrays using the #attached property.
+// 
+// 
+// @see https://www.drupal.org/node/2169605
+// @see https://www.drupal.org/node/2408597
+// drupal_add_js($path . '/comment_notify.js', $options);
+
   }
 }
 
@@ -81,7 +97,11 @@ function _comment_notify_options() {
   );
 
   $available_options = array();
-  $options = variable_get('comment_notify_available_alerts', drupal_map_assoc(array(COMMENT_NOTIFY_NODE, COMMENT_NOTIFY_COMMENT)));
+  // @FIXME
+// Could not extract the default value because it is either indeterminate, or
+// not scalar. You'll need to provide a default value in
+// config/install/comment_notify.settings.yml and config/schema/comment_notify.schema.yml.
+$options = \Drupal::config('comment_notify.settings')->get('comment_notify_available_alerts');
   foreach ($options as $key => $available) {
     if ($key == $available) {
       $available_options[$available] = $total_options[$available];
@@ -93,14 +113,18 @@ function _comment_notify_options() {
 
 
 function comment_notify_form_comment_form_alter(&$form, &$form_state, $form_id) {
-  global $user;
-  if (!(user_access('subscribe to comments') || user_access('administer comments'))) {
+  $user = \Drupal::currentUser();
+  if (!(\Drupal::currentUser()->hasPermission('subscribe to comments') || \Drupal::currentUser()->hasPermission('administer comments'))) {
     return;
   }
 
   // Only add the checkbox if this is an enabled content type
-  $node = node_load($form['nid']['#value'] ? $form['nid']['#value'] : $form['nid']['#default_value']);
-  $enabled_types = variable_get('comment_notify_node_types', drupal_map_assoc(array($node->type)));
+  $node = \Drupal::entityManager()->getStorage('node')->load($form['nid']['#value'] ? $form['nid']['#value'] : $form['nid']['#default_value']);
+  // @FIXME
+// Could not extract the default value because it is either indeterminate, or
+// not scalar. You'll need to provide a default value in
+// config/install/comment_notify.settings.yml and config/schema/comment_notify.schema.yml.
+$enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify_node_types');
   if (empty($enabled_types[$node->type])) {
     return;
   }
@@ -219,7 +243,7 @@ function comment_notify_disable_page($hash) {
 }
 
 function comment_notify_comment_validate($comment) {
-  global $user;
+  $user = \Drupal::currentUser();
   // We assume that if they are non-anonymous then they have a valid mail.
   // For anonymous users, though, we verify that they entered a mail and let comment.module validate it is real.
   if (!$user->uid && $comment['notify_settings']['notify']['#value'] && empty($comment['author']['mail']['#value'])) {
@@ -259,17 +283,17 @@ function comment_notify_comment_update($comment) {
 /**
  * Implements hook_comment_insert().
  */
-function comment_notify_comment_insert($comment) {
+function comment_notify_comment_insert(\Drupal\comment\CommentInterface $comment) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
-  global $user;
+  $user = \Drupal::currentUser();
   // For new comments, we first build up a string to be used as the identifier for the alert.
   // This identifier is used to later unsubscribe the user or allow them to
   // potentially edit their comment / preferences if they are anonymous.
   // The string is built with token and their host and comment identifier.
   // It is stored and referenced, we really just need something unique/unguessable.
-  $hostname = isset($comment->hostname) ? $comment->hostname : (isset($user->hostname) ? $user->hostname : '');
-  $notify_hash = drupal_get_token($hostname . $comment->cid);
+  $hostname = !$comment->getHostname() ? $comment->getHostname() : (isset($user->hostname) ? $user->hostname : '');
+  $notify_hash = drupal_get_token($hostname . $comment->id());
 
   if (!empty($comment->notify)) {
     $notify = $comment->notify_type;
@@ -283,24 +307,24 @@ function comment_notify_comment_insert($comment) {
     $notify = 0;
   }
   // And then save the data.
-  comment_notify_add_notification($comment->cid, $notify, $notify_hash);
+  comment_notify_add_notification($comment->id(), $notify, $notify_hash);
 
   // And send notifications - the real purpose of the module.
-  if ($comment->status == COMMENT_PUBLISHED) {
+  if ($comment->isPublished() == COMMENT_PUBLISHED) {
     _comment_notify_mailalert($comment);
   }
 }
 
-function comment_notify_comment_delete($comment) {
+function comment_notify_comment_delete(\Drupal\comment\CommentInterface $comment) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
-  comment_notify_remove_all_notifications($comment->cid);
+  comment_notify_remove_all_notifications($comment->id());
 }
 
 
 /**
  * Implement hook_form_alter().
  */
-function comment_notify_form_alter(&$form, &$form_state, $form_id) {
+function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface &$form_state, $form_id) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
   if (!($form_id == 'user_register_form' || $form_id == 'user_profile_form')) {
@@ -332,7 +356,7 @@ function comment_notify_form_alter(&$form, &$form_state, $form_id) {
     }
   }
 
-  if (user_access('administer nodes') || $nodes) {
+  if (\Drupal::currentUser()->hasPermission('administer nodes') || $nodes) {
     $form['comment_notify_settings']['node_notify'] = array(
       '#type' => 'checkbox',
       '#title' => t('Receive content follow-up notification e-mails'),
@@ -360,7 +384,14 @@ function comment_notify_form_alter(&$form, &$form_state, $form_id) {
   // Construct the user form
 }
 
-function comment_notify_user_update(&$edit, $account, $category) {
+/**
+ * @FIXME
+ * The $edit and $category parameters are gone in Drupal 8. They have been left
+ * here in order to prevent 'undefined variable' errors, but they will never
+ * actually be passed to this hook. You'll need to modify this function and
+ * remove every reference to them.
+ */
+function comment_notify_user_update(\Drupal\user\UserInterface $account, $category, $edit = NULL) {
   if ($category != 'account') {
     return;
   }
@@ -369,7 +400,7 @@ function comment_notify_user_update(&$edit, $account, $category) {
 
     // Save the values of node_notify_mailalert and comment_notify_mailalert
     // to {comment_notify_user_settings}.
-    comment_notify_set_user_notification_setting($account->uid, $edit['node_notify'], $edit['comment_notify']);
+    comment_notify_set_user_notification_setting($account->id(), $edit['node_notify'], $edit['comment_notify']);
   }
   // Unset them from $user so they don't also get saved into {users}.data.
   unset($edit['node_notify']);
@@ -429,9 +460,9 @@ function _comment_notify_mailalert($comment) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
   $comment = (object) $comment;
-  global $language;
+  $language = \Drupal::languageManager()->getCurrentLanguage();
   global $base_url;
-  global $user;
+  $user = \Drupal::currentUser();
   $initial_language = $language;
 
   $nid = $comment->nid;
@@ -444,10 +475,14 @@ function _comment_notify_mailalert($comment) {
     return;
   }
 
-  $node = node_load($nid);
+  $node = \Drupal::entityManager()->getStorage('node')->load($nid);
 
   // No mails if this is not an enabled content type.
-  $enabled_types = variable_get('comment_notify_node_types', array($node->type => TRUE));
+  // @FIXME
+// Could not extract the default value because it is either indeterminate, or
+// not scalar. You'll need to provide a default value in
+// config/install/comment_notify.settings.yml and config/schema/comment_notify.schema.yml.
+$enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify_node_types');
   if (empty($enabled_types[$node->type])) {
     return;
   }
@@ -462,7 +497,7 @@ function _comment_notify_mailalert($comment) {
   $sent_to = array();
 
   // Send to a subscribed author if they are not the current commenter.
-  $author = user_load($node->uid);
+  $author = \Drupal::entityManager()->getStorage('user')->load($node->uid);
 
   // Do they explicitly want this? Or is it default to send to users?
   // Is the comment author not the node author? Do they have access? Do they have an email (e.g. anonymous)?
@@ -474,7 +509,7 @@ function _comment_notify_mailalert($comment) {
       'body'  => comment_notify_variable_registry_get('node_notify_default_mailtext'), //JS @todo:change this.
     );
     foreach ($raw_values as $k => $v) {
-      $message[$k] = token_replace(t($v), array('comment' => $comment), array('sanitize' => FALSE));
+      $message[$k] = \Drupal::token()->replace(t($v), array('comment' => $comment), array('sanitize' => FALSE));
     }
 
     drupal_mail('comment_notify', 'comment_notify_mail', $author->mail, $language, $message);
@@ -490,10 +525,10 @@ function _comment_notify_mailalert($comment) {
   foreach ($watchers as $alert) {
     // If the user is not anonymous, always load the current e-mail address
     // from his or her user account instead of trusting $comment->mail.
-    $recipient_user = !empty($alert->uid) ? user_load($alert->uid) : drupal_anonymous_user();
+    $recipient_user = !empty($alert->uid) ? \Drupal::entityManager()->getStorage('user')->load($alert->uid) : drupal_anonymous_user();
     $mail = !empty($recipient_user->mail) ? $recipient_user->mail : $alert->cmail;
 
-    $relevant_thread = drupal_substr($thread, 0, drupal_strlen($alert->thread) -1);
+    $relevant_thread = \Drupal\Component\Utility\Unicode::substr($thread, 0, \Drupal\Component\Utility\Unicode::strlen($alert->thread) -1);
     if ($alert->notify == COMMENT_NOTIFY_COMMENT && strcmp($relevant_thread . '/', $alert->thread) != 0) {
       continue;
     }
@@ -514,7 +549,7 @@ function _comment_notify_mailalert($comment) {
       );
 
       foreach ($raw_values as $k => $v) {
-        $message[$k] = token_replace(t($v), array('comment' => $comment, 'comment-subscribed' => $alert), array('sanitize' => FALSE));
+        $message[$k] = \Drupal::token()->replace(t($v), array('comment' => $comment, 'comment-subscribed' => $alert), array('sanitize' => FALSE));
       }
 
       drupal_mail('comment_notify', 'comment_notify_mail', $mail, $language, $message);
@@ -522,22 +557,28 @@ function _comment_notify_mailalert($comment) {
 
       // Make the mail link to user's /edit, unless it's an anonymous user.
       if ($alert->uid != 0) {
-        $user_mail = l($mail, 'user/' . $alert->uid . '/edit');
+        // @FIXME
+// l() expects a Url object, created from a route name or external URI.
+// $user_mail = l($mail, 'user/' . $alert->uid . '/edit');
+
       }
       else {
-        $user_mail = check_plain($mail);
+        $user_mail = \Drupal\Component\Utility\Html::escape($mail);
       }
 
       // Add an entry to the watchdog log.
-      watchdog(
-        'comment_notify',
-        'Notified: @user_mail',
-        array('@user_mail' => $user_mail),
-          WATCHDOG_NOTICE,
-          l(t('source comment'), 'node/' . $nid, array(
-            'fragment' => 'comment-' . $alert->cid,
-          ))
-      );
+      // @FIXME
+// l() expects a Url object, created from a route name or external URI.
+// watchdog(
+//         'comment_notify',
+//         'Notified: @user_mail',
+//         array('@user_mail' => $user_mail),
+//           WATCHDOG_NOTICE,
+//           l(t('source comment'), 'node/' . $nid, array(
+//             'fragment' => 'comment-' . $alert->cid,
+//           ))
+//       );
+
 
       // Revert to previous (site default) locale.
       $language = $initial_language;
@@ -584,7 +625,7 @@ function comment_notify_unsubscribe_submit($form, &$form_state) {
     drupal_set_message(t("There were no active comment notifications for that email."));
   }
   else {
-    drupal_set_message(format_plural($comments, "Email unsubscribed from 1 comment notification.",
+    drupal_set_message(\Drupal::translation()->formatPlural($comments, "Email unsubscribed from 1 comment notification.",
       "Email unsubscribed from @count comment notifications."));
   }
 }
@@ -601,16 +642,24 @@ function comment_notify_settings() {
   $enabled_types = comment_notify_variable_registry_get('node_types');
   $anonymous_problems = '';
   foreach (node_type_get_names() as $type => $name) {
-    $checkboxes[$type] = check_plain($name);
+    $checkboxes[$type] = \Drupal\Component\Utility\Html::escape($name);
     $default[] = $type;
 
     // If they don't have the ability to leave contact info, then we make a report
-    if (isset($enabled_types[$type]) && $enabled_types[$type] && variable_get('comment_anonymous_' . $type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
-      $account = drupal_anonymous_user();
-      if (user_access('subscribe to comments', $account)) {
-        $anonymous_problems[] = l(t('@content-type', array('@content-type' => $name)), 'admin/structure/types/manage/' . $type);
-      }
-    }
+    // @FIXME
+// // @FIXME
+// // The correct configuration object could not be determined. You'll need to
+// // rewrite this call manually.
+// if (isset($enabled_types[$type]) && $enabled_types[$type] && variable_get('comment_anonymous_' . $type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
+//       $account = drupal_anonymous_user();
+//       if ($account->hasPermission('subscribe to comments')) {
+//         // @FIXME
+// // l() expects a Url object, created from a route name or external URI.
+// // $anonymous_problems[] = l(t('@content-type', array('@content-type' => $name)), 'admin/structure/types/manage/' . $type);
+// 
+//       }
+//     }
+
   }
 
   if (!empty($anonymous_problems)) {

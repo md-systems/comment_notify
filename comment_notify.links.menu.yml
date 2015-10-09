@@ -1,0 +1,4 @@
+comment_notify.settings:
+  route_name: comment_notify.settings
+  title: 'Comment Notify'
+  description: 'Configure settings for e-mails about new comments.'

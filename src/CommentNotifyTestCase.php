@@ -1,4 +1,5 @@
 <?php
+namespace Drupal\comment_notify;
 
 /**
  * @file

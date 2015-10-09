@@ -196,7 +196,7 @@ function comment_notify_get_watchers($nid) {
     ':status' => COMMENT_PUBLISHED,
     ':notify' => COMMENT_NOTIFY_DISABLED,
   ))->fetchCol();
-  return comment_load_multiple($cids);
+  return \Drupal::entityManager()->getStorage('comment')->loadMultiple($cids);
 }
 
 /**
@@ -323,7 +323,12 @@ function comment_notify_variable_registry_get($name) {
 
   // Errors
   $variables['error_anonymous_email_missing'] = 'If you want to subscribe to comments you must supply a valid e-mail address.';
-  return variable_get("comment_notify_" . $name, $variables[$name]);
+  // @FIXME
+// // @FIXME
+// // The correct configuration object could not be determined. You'll need to
+// // rewrite this call manually.
+// return variable_get("comment_notify_" . $name, $variables[$name]);
+
 }
 
 /**
@@ -334,5 +339,10 @@ function comment_notify_variable_registry_get($name) {
  * @return boolean
  */
 function comment_notify_variable_registry_set($name, $value) {
-  return variable_set("comment_notify_" . $name, $value);
+  // @FIXME
+// // @FIXME
+// // The correct configuration object could not be determined. You'll need to
+// // rewrite this call manually.
+// return variable_set("comment_notify_" . $name, $value);
+
 }
