@@ -188,7 +188,8 @@ function comment_notify_get_notification_type($cid) {
  * Get a list of mails which need to be contacted for a node.
  *
  * @param integer $nid
- * @return QueryStatement
+ * @return \Drupal\comment\CommentInterface[]
+ *   A list of comment entities.
  */
 function comment_notify_get_watchers($nid) {
   $cids = db_query("SELECT c.cid FROM {comment} c INNER JOIN {comment_notify} cn ON c.cid = cn.cid LEFT JOIN {users} u ON c.uid = u.uid WHERE c.nid = :nid AND c.status = :status AND cn.notify <> :notify AND (u.uid = 0 OR u.status = 1)", array(

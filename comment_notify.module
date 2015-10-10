@@ -6,6 +6,11 @@
  * This module provides comment follow-up e-mail notification for anonymous and registered users.
  */
 
+use Drupal\comment\CommentInterface;
+use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Language\LanguageInterface;
+
 define('COMMENT_NOTIFY_DISABLED', 0);
 define('COMMENT_NOTIFY_NODE', 1);
 define('COMMENT_NOTIFY_COMMENT', 2);
@@ -453,20 +458,14 @@ function comment_notify_comment_load($comments) {
 /**
  * Private function to send the notifications.
  *
- * @param $comment
- *   The comment array as found in hook_comment $op = publish.
+ * @param \Drupal\comment\CommentInterface $comment
+ *   The comment entity.
  */
-function _comment_notify_mailalert($comment) {
+function _comment_notify_mailalert(CommentInterface $comment) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
-  $comment = (object) $comment;
-  $language = \Drupal::languageManager()->getCurrentLanguage();
-  global $base_url;
   $user = \Drupal::currentUser();
-  $initial_language = $language;
-
-  $nid = $comment->nid;
-  $cid = $comment->cid;
+  $nid = $comment->getCommentedEntityId();
 
   // Check to see if a notification has already been sent for this
   // comment so that edits to a comment don't trigger an additional
@@ -475,20 +474,17 @@ function _comment_notify_mailalert($comment) {
     return;
   }
 
+  /** @var \Drupal\node\NodeInterface $node */
   $node = \Drupal::entityManager()->getStorage('node')->load($nid);
 
   // No mails if this is not an enabled content type.
-  // @FIXME
-// Could not extract the default value because it is either indeterminate, or
-// not scalar. You'll need to provide a default value in
-// config/install/comment_notify.settings.yml and config/schema/comment_notify.schema.yml.
-$enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify_node_types');
-  if (empty($enabled_types[$node->type])) {
+  $enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify_node_types') ?: [$node->getEntityTypeId()];
+  if (empty($enabled_types[$node->getEntityTypeId()])) {
     return;
   }
 
   if (empty($comment->mail)) {
-    $comment_account = user_load_by_name($comment->name);
+    $comment_account = user_load_by_name($comment->getAuthorName());
     $comment_mail = isset($comment_account->mail) ? $comment_account->mail : '';
   }
   else {
@@ -497,13 +493,21 @@ $enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify
   $sent_to = array();
 
   // Send to a subscribed author if they are not the current commenter.
-  $author = \Drupal::entityManager()->getStorage('user')->load($node->uid);
+  $author = $node->getOwner();
 
   // Do they explicitly want this? Or is it default to send to users?
   // Is the comment author not the node author? Do they have access? Do they have an email (e.g. anonymous)?
-  if (((!empty($author->comment_notify_settings->node_notify) && $author->comment_notify_settings->node_notify == 1) || (comment_notify_variable_registry_get('node_notify_default_mailalert') == 1 && !isset($author->comment_notify_settings->node_notify))) && $user->uid != $author->uid && node_access('view', $node, $author) && !empty($author->mail)) {
+  if (
+    (
+      (!empty($author->comment_notify_settings->node_notify) && $author->comment_notify_settings->node_notify == 1)
+      || (comment_notify_variable_registry_get('node_notify_default_mailalert') == 1 && !isset($author->comment_notify_settings->node_notify))
+    )
+    && $user->id() != $author->id()
+    && $node->access('view', $author)
+    && !empty($author->getEmail())
+  ) {
     // Get the author's language.
-    $language = user_preferred_language($author);
+    $language = $author->getPreferredLangcode();
     $raw_values = array(
       'subject' => comment_notify_variable_registry_get('author_subject'),
       'body'  => comment_notify_variable_registry_get('node_notify_default_mailtext'), //JS @todo:change this.
@@ -512,12 +516,12 @@ $enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify
       $message[$k] = \Drupal::token()->replace(t($v), array('comment' => $comment), array('sanitize' => FALSE));
     }
 
-    drupal_mail('comment_notify', 'comment_notify_mail', $author->mail, $language, $message);
-    $sent_to[] = strtolower($author->mail);
+    \Drupal::service('plugin.manager.mail')->mail('comment_notify', 'comment_notify_mail', $author->getEmail(), $language, $message);
+    $sent_to[] = strtolower($author->getEmail());
   }
 
   // For "reply to my comments" notifications, figure out what thread this is.
-  $thread = isset($comment->thread) ? $comment->thread : '';
+  $thread = $comment->getThread() ?: '';
 
   // Get the list of commenters to notify.
   $watchers = comment_notify_get_watchers($nid);
@@ -525,21 +529,21 @@ $enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify
   foreach ($watchers as $alert) {
     // If the user is not anonymous, always load the current e-mail address
     // from his or her user account instead of trusting $comment->mail.
-    $recipient_user = !empty($alert->uid) ? \Drupal::entityManager()->getStorage('user')->load($alert->uid) : drupal_anonymous_user();
-    $mail = !empty($recipient_user->mail) ? $recipient_user->mail : $alert->cmail;
+    $recipient_user = $alert->getOwner();
+    $mail = !empty($recipient_user->getEmail()) ? $recipient_user->getEmail() : $alert->getAuthorEmail();
 
-    $relevant_thread = \Drupal\Component\Utility\Unicode::substr($thread, 0, \Drupal\Component\Utility\Unicode::strlen($alert->thread) -1);
-    if ($alert->notify == COMMENT_NOTIFY_COMMENT && strcmp($relevant_thread . '/', $alert->thread) != 0) {
+    $relevant_thread = Unicode::substr($thread, 0, Unicode::strlen($alert->getThread()) -1);
+    if ($alert->notify == COMMENT_NOTIFY_COMMENT && strcmp($relevant_thread . '/', $alert->getThread()) != 0) {
       continue;
     }
 
-    if ($mail != $comment_mail && !in_array(strtolower($mail), $sent_to) && ($alert->uid != $comment->uid || $alert->uid == 0)) {
+    if ($mail != $comment_mail && !in_array(strtolower($mail), $sent_to) && ($alert->getOwnerId() != $comment->getOwnerId() || $alert->getOwnerId() == 0)) {
 
       $message = array();
-      $language = !empty($alert->uid) ? user_preferred_language($recipient_user) : language_default();
+      $language = !empty($alert->uid) ? $recipient_user->getPreferredLangcode() : LanguageInterface::LANGCODE_DEFAULT;
 
       // Make sure they have access to this node before showing a bunch of node information.
-      if (!node_access('view', $node, $recipient_user)) {
+      if (!$node->access('view', $recipient_user)) {
         continue;
       }
 
@@ -552,36 +556,19 @@ $enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify
         $message[$k] = \Drupal::token()->replace(t($v), array('comment' => $comment, 'comment-subscribed' => $alert), array('sanitize' => FALSE));
       }
 
-      drupal_mail('comment_notify', 'comment_notify_mail', $mail, $language, $message);
+      \Drupal::service('plugin.manager.mail')->mail('comment_notify', 'comment_notify_mail', $mail, $language, $message);
       $sent_to[] = strtolower($mail);
 
       // Make the mail link to user's /edit, unless it's an anonymous user.
-      if ($alert->uid != 0) {
-        // @FIXME
-// l() expects a Url object, created from a route name or external URI.
-// $user_mail = l($mail, 'user/' . $alert->uid . '/edit');
-
+      if ($alert->getOwnerId() != 0) {
+        $user_mail = $alert->link($mail, 'edit-form');
       }
       else {
-        $user_mail = \Drupal\Component\Utility\Html::escape($mail);
+        $user_mail = Html::escape($mail);
       }
 
       // Add an entry to the watchdog log.
-      // @FIXME
-// l() expects a Url object, created from a route name or external URI.
-// watchdog(
-//         'comment_notify',
-//         'Notified: @user_mail',
-//         array('@user_mail' => $user_mail),
-//           WATCHDOG_NOTICE,
-//           l(t('source comment'), 'node/' . $nid, array(
-//             'fragment' => 'comment-' . $alert->cid,
-//           ))
-//       );
-
-
-      // Revert to previous (site default) locale.
-      $language = $initial_language;
+      \Drupal::logger('comment_notify')->notice('Notified: @user_mail', ['@user_mail' => $user_mail, 'link' => $alert->link(t('source comment'))]);
     }
   }
   // Record that a notification was sent for this comment so that
