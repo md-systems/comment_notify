@@ -232,12 +232,12 @@ function comment_notify_unsubscribe_by_email($mail) {
   $update_query = db_update('comment_notify');
   $update_query->fields(array('notify' => 0));
 
-  $comment_query = db_select('comment', 'c');
+  $comment_query = db_select('comment_field_data', 'c');
   $comment_query->fields('c', array('cid'));
 
-  $uid = db_select('users', 'u')
-    ->fields('u', array('uid'))
-    ->condition('mail', $mail)
+  $uid = db_select('users_field_data', 'u')
+    ->fields('u', ['uid'])
+    ->condition('mail', $mail, '=')
     ->execute()
     ->fetchField();
   if ($uid) {
