@@ -6,8 +6,6 @@ available_alerts:
 enable_default:
   watcher: none
   entity_author: false
-errors:
-  anonymous_email_missing: 'If you want to subscribe to comments you must supply a valid e-mail address.'
 mail_templates:
   watcher:
     subject: '[site:name] :: new comment on [comment:node:title]'

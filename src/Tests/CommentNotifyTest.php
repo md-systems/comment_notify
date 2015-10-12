@@ -1,30 +1,38 @@
 <?php
-namespace Drupal\comment_notify;
-
 /**
  * @file
- * Creates tests for comment_notify module.
+ * Contains \Drupal\comment_notify\Tests\CommentNotifyTest.
  */
-class CommentNotifyTestCase extends DrupalWebTestCase {
-  /**
-   * Implementation of getInfo().
-   */
-  public static function getInfo() {
-    return array(
-      'name' => t('Comment notify general tests'),
-      'description' => t('Test the various comment notification settings.'),
-      'group' => t('Comment notify'),
-    );
-  }
+namespace Drupal\comment_notify\Tests;
+
+use Drupal\comment\Tests\CommentTestTrait;
+use Drupal\Core\Entity\Entity\EntityViewDisplay;
+use Drupal\Core\Language\Language;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\node\NodeInterface;
+use Drupal\simpletest\WebTestBase;
+
+/**
+ * Comment notify general tests.
+ *
+ * @group comment_notify
+ */
+class CommentNotifyTest extends WebTestBase {
+  use CommentTestTrait;
 
   /**
-   * Implementation of setUp().
+   * Modules to enable.
+   *
+   * @var array
    */
-  function setUp() {
-    parent::setUp('comment_notify');
-    // Create a content type where commenting is enabled.
-    // Allow contact info for anons on that content type, and make preview optional.
-  }
+  protected static $modules = [
+    'comment_notify',
+    'node',
+    'comment',
+    'token',
+  ];
 
   /**
    * Test various behaviors for anonymous users.
@@ -36,42 +44,40 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
     $this->drupalLogin($admin_user);
 
     // Enable comment notify on this node and allow anonymous information in comments.
-    \Drupal::configFactory()->getEditable('comment_notify.settings')->set('comment_notify_node_types', array('article' => 'article', 'page' => 0))->save();
-    // @FIXME
-// // @FIXME
-// // This looks like another module's variable. You'll need to rewrite this call
-// // to ensure that it uses the correct configuration object.
-// variable_set('comment_anonymous_article', '1');
-
+    $this->drupalCreateContentType([
+      'type' => 'article',
+    ]);
+    $this->addDefaultCommentField('node', 'article');
+    $comment_field = FieldConfig::loadByName('node', 'article', 'comment');
+    $comment_field->setSetting('anonymous', COMMENT_ANONYMOUS_MAY_CONTACT);
+    $comment_field->save();
 
     // Create a node with comments allowed.
-    $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => NODE_PROMOTED, 'comment' => COMMENT_NODE_OPEN));
+    $node = $this->drupalCreateNode(array('type' => 'article', 'promote' => NODE_PROMOTED));
 
     // Allow anonymous users to post comments and get notifications.
-    user_role_grant_permissions(\Drupal\Core\Session\AccountInterface::ANONYMOUS_ROLE, array('access comments', 'access content', 'post comments', 'skip comment approval', 'subscribe to comments'));
+    user_role_grant_permissions(AccountInterface::ANONYMOUS_ROLE, array('access comments', 'access content', 'post comments', 'skip comment approval', 'subscribe to comments'));
     $this->drupalLogout();
 
     // Notify type 1 - All comments on the node.
     // First confirm that we properly require an e-mail address.
-    $subscribe_1 = array('notify' => TRUE, 'notify_type' => 1);
-    $this->postCommentNotifyComment($this->node, $this->randomName(), $this->randomName(), $subscribe_1);
-
-    // This is still a bad test to test for a static string showing on the page, but at least the definition of the string is centralized.
-    $expected_error = \Drupal::config('comment_notify.settings')->get('error_anonymous_email_missing');
-    $this->assertText(t($expected_error));
+    $subscribe_1 = array('notify' => TRUE, 'notify_type' => COMMENT_NOTIFY_NODE);
+    $this->drupalGet($node->url());
+    $this->postCommentNotifyComment($node, $this->randomMachineName(), $this->randomMachineName(), $subscribe_1);
+    $this->assertText(t('If you want to subscribe to comments you must supply a valid e-mail address.'));
 
     // Try again with an e-mail address.
-    $contact_1 = array('name' => $this->randomName(), 'mail' => $this->getRandomEmailAddress());
-    $anonymous_comment_1 = $this->postCommentNotifyComment($this->node, $this->randomName(), $this->randomName(), $subscribe_1, $contact_1);
+    $contact_1 = array('name' => $this->randomMachineName(), 'mail' => $this->getRandomEmailAddress());
+    $anonymous_comment_1 = $this->postCommentNotifyComment($node, $this->randomMachineName(), $this->randomMachineName(), $subscribe_1, $contact_1);
 
     // Confirm that the notification is saved.
     $result = comment_notify_get_notification_type($anonymous_comment_1['id']);
     $this->assertEqual($result, $subscribe_1['notify_type'], 'Notify selection option 1 is saved properly.');
 
     // Notify type 2 - replies to a comment.
-    $subscribe_2 = array('notify' => TRUE, 'notify_type' => 2);
-    $contact_2 = array('name' => $this->randomName(), 'mail' => $this->getRandomEmailAddress());
-    $anonymous_comment_2 = $this->postCommentNotifyComment($this->node, $this->randomName(), $this->randomName(), $subscribe_2, $contact_2);
+    $subscribe_2 = array('notify' => TRUE, 'notify_type' => COMMENT_NOTIFY_COMMENT);
+    $contact_2 = array('name' => $this->randomMachineName(), 'mail' => $this->getRandomEmailAddress());
+    $anonymous_comment_2 = $this->postCommentNotifyComment($node, $this->randomMachineName(), $this->randomMachineName(), $subscribe_2, $contact_2);
 
     // Confirm that the notification is saved.
     $result = comment_notify_get_notification_type($anonymous_comment_2['id']);
@@ -81,10 +87,10 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
     $this->assertMail('to', $contact_1['mail'], t('Message was sent to the proper anonymous user.'));
 
     // Notify type 0 (i.e. only one mode is enabled).
-    \Drupal::configFactory()->getEditable('comment_notify.settings')->set('comment_notify_available_alerts', array(1 => 0, 2 => 2))->save();
+    \Drupal::configFactory()->getEditable('comment_notify.settings')->set('available_alerts', ['node' => FALSE, 'comment' => TRUE])->save();
     $subscribe_0 = array('notify' => TRUE);
     $contact_0 = array('mail' => $this->getRandomEmailAddress());
-    $anonymous_comment_0 = $this->postCommentNotifyComment($this->node, $this->randomName(), $this->randomName(), $subscribe_0, $contact_0);
+    $anonymous_comment_0 = $this->postCommentNotifyComment($node, $this->randomMachineName(), $this->randomMachineName(), $subscribe_0, $contact_0);
 
     // Confirm that the notification is saved.
     $result = comment_notify_get_notification_type($anonymous_comment_0['id']);
@@ -92,11 +98,6 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
 
     // TODO yet more tests.
   }
-
-  /////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-  ////////////////////////// COPIED FROM 7.X COMMENT.TEST \\\\\\\\\\\\\\\\\\\\\
-  //////////////////////////////and tweaked a little\\\\\\\\\\\\\\\\\\\\\\\\\\\
-  /////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
   /**
    * Post comment.
@@ -107,11 +108,10 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
    * @param boolean $preview Should preview be required.
    * @param mixed $contact Set to NULL for no contact info, TRUE to ignore success checking, and array of values to set contact info.
    */
-  function postCommentNotifyComment($node, $subject, $comment, $notify, $contact = NULL) {
-    $langcode = \Drupal\Core\Language\Language::LANGCODE_NOT_SPECIFIED;
+  protected function postCommentNotifyComment(NodeInterface $node, $subject, $comment, $notify, $contact = NULL) {
     $edit = array();
-    $edit['subject'] = $subject;
-    $edit['comment_body[' . $langcode . '][0][value]'] = $comment;
+    $edit['subject[0][value]'] = $subject;
+    $edit['comment_body[0][value]'] = $comment;
 
     if ($notify !== NULL && is_array($notify)) {
       $edit += $notify;
@@ -121,7 +121,7 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
       $edit += $contact;
     }
 
-    $this->drupalPost('node/' . $node->nid, $edit, t('Save'));
+    $this->drupalPostForm($node->url(), $edit, t('Save'));
 
     $match = array();
     // Get comment ID
@@ -157,7 +157,7 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
       $regex .= $comment->comment . '(.*?)'; // Match comment.
       $regex .= '<\/div>/s'; // Dot matches newlines and ensure that match doesn't bleed outside comment div.
 
-      return (boolean)preg_match($regex, $this->drupalGetContent());
+      return (boolean)preg_match($regex, $this->getRawContent());
     }
     else {
       return FALSE;
@@ -170,6 +170,6 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
    * @return string.
    */
   function getRandomEmailAddress() {
-    return $this->randomName() . '@example.com';
+    return $this->randomMachineName() . '@example.com';
   }
 }

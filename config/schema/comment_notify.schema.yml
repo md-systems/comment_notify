@@ -1,0 +1,49 @@
+comment_notify.settings:
+  type: config_object
+  mapping:
+    node_types:
+      type: sequence
+      label: Content types to enable for comment notification
+      sequence:
+        type: string
+    available_alerts:
+      type: mapping
+      label: Available subscription modes
+      mapping:
+        node:
+          type: boolean
+        comment:
+          type: boolean
+    enable_default:
+      type: mapping
+      mapping:
+        watcher:
+          type: string
+          label: Default state for the notification selection box
+        entity_author:
+          type: boolean
+          label: Subscribe users to their node follow-up notification emails by default
+    mail_templates:
+      type: mapping
+      label: Default mail text for sending out notifications
+      mapping:
+        watcher:
+          type: mapping
+          label: Notifications to commenters
+          mapping:
+            subject:
+              type: label
+              label: Subject
+            body:
+              type: text
+              label: Body
+        entity_author:
+          type: mapping
+          label: Notifications to owner of commented entity
+          mapping:
+            subject:
+              type: label
+              label: Subject
+            body:
+              type: text
+              label: Body
