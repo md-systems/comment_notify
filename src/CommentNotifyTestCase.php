@@ -57,7 +57,7 @@ class CommentNotifyTestCase extends DrupalWebTestCase {
     $this->postCommentNotifyComment($this->node, $this->randomName(), $this->randomName(), $subscribe_1);
 
     // This is still a bad test to test for a static string showing on the page, but at least the definition of the string is centralized.
-    $expected_error = comment_notify_variable_registry_get('error_anonymous_email_missing');
+    $expected_error = \Drupal::config('comment_notify.settings')->get('error_anonymous_email_missing');
     $this->assertText(t($expected_error));
 
     // Try again with an e-mail address.

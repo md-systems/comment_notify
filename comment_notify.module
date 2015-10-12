@@ -11,52 +11,52 @@ use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Language\LanguageInterface;
 
-define('COMMENT_NOTIFY_DISABLED', 0);
-define('COMMENT_NOTIFY_NODE', 1);
-define('COMMENT_NOTIFY_COMMENT', 2);
+define('COMMENT_NOTIFY_DISABLED', 'none');
+define('COMMENT_NOTIFY_NODE', 'node');
+define('COMMENT_NOTIFY_COMMENT', 'comment');
 
 
-define('AUTHOR_MAILTEXT',
-'Hi [comment:node:author],
+//define('AUTHOR_MAILTEXT',
+//'Hi [comment:node:author],
+//
+//You have received a comment on: "[comment:node:title]"
+//
+//----
+//[comment:title]
+//[comment:body]
+//----
+//
+//You can view the comment at the following url
+//[comment:url]
+//
+//You will receive emails like this for all replies to your posts. You can
+//disable this by logging in and changing the settings on your user account at
+//[comment:node:author:edit-url].
+//
+//-- [site:name] team
+//[site:url]');
 
-You have received a comment on: "[comment:node:title]"
-
-----
-[comment:title]
-[comment:body]
-----
-
-You can view the comment at the following url
-[comment:url]
-
-You will receive emails like this for all replies to your posts. You can
-disable this by logging in and changing the settings on your user account at
-[comment:node:author:edit-url].
-
--- [site:name] team
-[site:url]');
-
-define('DEFAULT_MAILTEXT',
-'Hi [comment-subscribed:author],
-
-[comment:author] has commented on: "[comment:node:title]"
-
-----
-[comment:title]
-[comment:body]
-----
-
-You can view the comment at the following url
-[comment:url]
-
-You can stop receiving emails when someone replies to this post,
-by going to [comment-subscribed:unsubscribe-url]
-
-You can set up auto-following feature for all future posts
-by creating your own user with a few clicks here [site:login-url]
-
--- [site:name] team
-[site:url]');
+//define('DEFAULT_MAILTEXT',
+//'Hi [comment-subscribed:author],
+//
+//[comment:author] has commented on: "[comment:node:title]"
+//
+//----
+//[comment:title]
+//[comment:body]
+//----
+//
+//You can view the comment at the following url
+//[comment:url]
+//
+//You can stop receiving emails when someone replies to this post,
+//by going to [comment-subscribed:unsubscribe-url]
+//
+//You can set up auto-following feature for all future posts
+//by creating your own user with a few clicks here [site:login-url]
+//
+//-- [site:name] team
+//[site:url]');
 
 
 /**
@@ -101,17 +101,8 @@ function _comment_notify_options() {
     COMMENT_NOTIFY_COMMENT  => t('Replies to my comment')
   );
 
-  $available_options = array();
-  // @FIXME
-// Could not extract the default value because it is either indeterminate, or
-// not scalar. You'll need to provide a default value in
-// config/install/comment_notify.settings.yml and config/schema/comment_notify.schema.yml.
-$options = \Drupal::config('comment_notify.settings')->get('comment_notify_available_alerts');
-  foreach ($options as $key => $available) {
-    if ($key == $available) {
-      $available_options[$available] = $total_options[$available];
-    }
-  }
+  $selected_options = array_filter(\Drupal::config('comment_notify.settings')->get('available_alerts'));
+  $available_options = array_intersect_key($total_options, $selected_options);
 
   return $available_options;
 }
@@ -365,7 +356,7 @@ function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface 
     $form['comment_notify_settings']['node_notify'] = array(
       '#type' => 'checkbox',
       '#title' => t('Receive content follow-up notification e-mails'),
-      '#default_value' => isset($node_notify) ? $node_notify : comment_notify_variable_registry_get('node_notify_default_mailalert'),
+      '#default_value' => isset($node_notify) ? $node_notify : \Drupal::config('comment_notify.settings')->get('node_notify_default_mailalert'),
       '#description' => t('Check this box to receive an e-mail notification for follow-ups on your content. You can not disable notifications for individual threads.')
     );
   }
@@ -381,7 +372,7 @@ function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface 
   $form['comment_notify_settings']['comment_notify'] = array(
     '#type' => 'select',
     '#title' => t('Receive comment follow-up notification e-mails'),
-    '#default_value' => isset($comment_notify) ? array($comment_notify) : array(comment_notify_variable_registry_get('default_registered_mailalert')),
+    '#default_value' => isset($comment_notify) ? array($comment_notify) : array(\Drupal::config('comment_notify.settings')->get('default_registered_mailalert')),
     '#options' => $available_options,
     '#description' => t("Check this box to receive e-mail notification for follow-up comments to comments you posted. You can later disable this on a post-by-post basis... so if you leave this to YES, you can still disable follow-up notifications for comments you don't want follow-up mails anymore - i.e. for very popular posts.")
   );
@@ -464,6 +455,7 @@ function comment_notify_comment_load($comments) {
 function _comment_notify_mailalert(CommentInterface $comment) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
+  $config = \Drupal::config('comment_notify.settings');
   $user = \Drupal::currentUser();
   $nid = $comment->getCommentedEntityId();
 
@@ -478,7 +470,7 @@ function _comment_notify_mailalert(CommentInterface $comment) {
   $node = \Drupal::entityManager()->getStorage('node')->load($nid);
 
   // No mails if this is not an enabled content type.
-  $enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify_node_types') ?: [$node->getEntityTypeId()];
+  $enabled_types = $config->get('comment_notify_node_types') ?: [$node->getEntityTypeId()];
   if (empty($enabled_types[$node->getEntityTypeId()])) {
     return;
   }
@@ -500,7 +492,7 @@ function _comment_notify_mailalert(CommentInterface $comment) {
   if (
     (
       (!empty($author->comment_notify_settings->node_notify) && $author->comment_notify_settings->node_notify == 1)
-      || (comment_notify_variable_registry_get('node_notify_default_mailalert') == 1 && !isset($author->comment_notify_settings->node_notify))
+      || ($config->get('node_notify_default_mailalert') == 1 && !isset($author->comment_notify_settings->node_notify))
     )
     && $user->id() != $author->id()
     && $node->access('view', $author)
@@ -509,8 +501,8 @@ function _comment_notify_mailalert(CommentInterface $comment) {
     // Get the author's language.
     $language = $author->getPreferredLangcode();
     $raw_values = array(
-      'subject' => comment_notify_variable_registry_get('author_subject'),
-      'body'  => comment_notify_variable_registry_get('node_notify_default_mailtext'), //JS @todo:change this.
+      'subject' => $config->get('author_subject'),
+      'body'  => $config->get('node_notify_default_mailtext'), //JS @todo:change this.
     );
     foreach ($raw_values as $k => $v) {
       $message[$k] = \Drupal::token()->replace(t($v), array('comment' => $comment), array('sanitize' => FALSE));
@@ -548,8 +540,8 @@ function _comment_notify_mailalert(CommentInterface $comment) {
       }
 
       $raw_values = array(
-        'subject' => comment_notify_variable_registry_get('watcher_subject'),
-        'body'  => comment_notify_variable_registry_get('comment_notify_default_mailtext'), //JS @todo:change this var name.
+        'subject' => $config->get('watcher_subject'),
+        'body'  => $config->get('comment_notify_default_mailtext'), //JS @todo:change this var name.
       );
 
       foreach ($raw_values as $k => $v) {
@@ -617,130 +609,6 @@ function comment_notify_unsubscribe_submit($form, &$form_state) {
   }
 }
 
-/*
- * Page callback for administrative settings form.
- */
-function comment_notify_settings() {
-  module_load_include('inc', 'comment_notify', 'comment_notify');
-
-  $form['comment_notify_settings'] = array();
-
-  // Only perform comment_notify for certain node types.
-  $enabled_types = comment_notify_variable_registry_get('node_types');
-  $anonymous_problems = '';
-  foreach (node_type_get_names() as $type => $name) {
-    $checkboxes[$type] = \Drupal\Component\Utility\Html::escape($name);
-    $default[] = $type;
-
-    // If they don't have the ability to leave contact info, then we make a report
-    // @FIXME
-// // @FIXME
-// // The correct configuration object could not be determined. You'll need to
-// // rewrite this call manually.
-// if (isset($enabled_types[$type]) && $enabled_types[$type] && variable_get('comment_anonymous_' . $type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
-//       $account = drupal_anonymous_user();
-//       if ($account->hasPermission('subscribe to comments')) {
-//         // @FIXME
-// // l() expects a Url object, created from a route name or external URI.
-// // $anonymous_problems[] = l(t('@content-type', array('@content-type' => $name)), 'admin/structure/types/manage/' . $type);
-// 
-//       }
-//     }
-
-  }
-
-  if (!empty($anonymous_problems)) {
-    drupal_set_message(t('Anonymous commenters have the permission to subscribe to comments but cannot leave their contact information on the following content types: !types.  You should either disable subscriptions on those types here, revoke the permission for anonymous users, or enable anonymous users to leave their contact information in the comment settings.', array('!types' => implode(', ', $anonymous_problems))), 'status', FALSE);
-  }
-
-  $form['comment_notify_settings']['comment_notify_node_types'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Content types to enable for comment notification'),
-    '#default_value' => $enabled_types,
-    '#options' => $checkboxes,
-    '#description' => t('Comments on content types enabled here will have the option of comment notification.'),
-  );
-
-  $form['comment_notify_settings']['comment_notify_available_alerts'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Available subscription modes'),
-    '#return_value' => 1,
-    '#default_value' => comment_notify_variable_registry_get('available_alerts'),
-    '#description' => t('Choose which notification subscription styles are available for users'),
-    '#options' => array(
-  COMMENT_NOTIFY_NODE     => t('All comments'),
-  COMMENT_NOTIFY_COMMENT  => t('Replies to my comment')
-  )
-  );
-
-  $available_options[COMMENT_NOTIFY_DISABLED] = t('No notifications');
-  $available_options += _comment_notify_options();
-  $form['comment_notify_settings']['comment_notify_default_anon_mailalert'] = array(
-    '#type' => 'select',
-    '#title' => t('Default state for the notification selection box for anonymous users'),
-    '#return_value' => 1,
-    '#default_value' => comment_notify_variable_registry_get('default_anon_mailalert'),
-    '#options' => $available_options,
-  );
-
-  $form['comment_notify_settings']['comment_notify_default_registered_mailalert'] = array(
-    '#type' => 'select',
-    '#title' => t('Default state for the notification selection box for registered users'),
-    '#return_value' => 1,
-    '#default_value' => comment_notify_variable_registry_get('default_registered_mailalert'),
-    '#description' => t('This flag presets the flag for the follow-up notification on the form that anon users will see when posting a comment'),
-    '#options' => $available_options,
-  );
-
-  $form['comment_notify_settings']['comment_notify_node_notify_default_mailalert'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Subscribe users to their node follow-up notification emails by default'),
-    '#default_value' => comment_notify_variable_registry_get('node_notify_default_mailalert'),
-    '#description' => t('If this is checked, new users will receive e-mail notifications for follow-ups on their nodes by default until they individually disable the feature.'),
-  );
-
-  $form['comment_notify_settings']['comment_notify_comment_notify_default_mailtext'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Default mail text for sending out notifications to commenters'),
-    '#default_value' => comment_notify_variable_registry_get('comment_notify_default_mailtext'),
-    '#return_value' => 1,
-    '#cols' => 80,
-    '#rows' => 15,
-    '#token_types' => array('comment'),
-    '#element_validate' => array('token_element_validate'),
-  );
-
-  $form['comment_notify_settings']['comment_notify_node_notify_default_mailtext'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Default mail text for sending out the notifications to node authors'),
-    '#default_value' => comment_notify_variable_registry_get('node_notify_default_mailtext'),
-     '#return_value' => 1,
-     '#cols' => 80,
-     '#rows' => 15,
-     '#token_types' => array('comment'),
-     '#element_validate' => array('token_element_validate'),
-  );
-
-  $form['comment_notify_settings']['token_help'] = array(
-    '#theme' => 'token_tree',
-    '#token_types' => array('comment'),
-  );
-
-  $form['#validate'] = array('comment_notify_settings_validate');
-
-  return system_settings_form($form);
-}
-
-function comment_notify_settings_validate($form, &$form_state) {
-  $sum_enabled = 0;
-  foreach ($form_state['values']['comment_notify_available_alerts'] as $enabled) {
-    $sum_enabled += $enabled;
-  }
-  if (!$sum_enabled) {
-    form_set_error('comment_notify_available_alerts', 'You must enable at least one subscription mode.');
-  }
-}
-
 /**
  * Get the unsubscribe link for a comment subscriber.
  *
@@ -764,7 +632,7 @@ function comment_notify_field_extra_fields() {
   module_load_include('inc', 'comment_notify', 'comment_notify');
   $extras = array();
 
-  foreach (comment_notify_variable_registry_get('node_types') as $node_type) {
+  foreach (\Drupal::config('comment_notify.settings')->get('node_types') as $node_type) {
     if (isset($node_type)) {
       $extras['comment']['comment_node_' . $node_type]['form']['comment_notify_settings'] = array(
         'label' => t('Comment Notify settings'),
