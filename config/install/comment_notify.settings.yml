@@ -1,52 +1,55 @@
-author_subject: '[site:name] :: new comment for your post.'
+node_types:
+  - article
 available_alerts:
   node: true
   comment: true
-default_anon_mailalert: node
-node_notify_default_mailtext: |
-  Hi [comment:node:author],
-
-  You have received a comment on: "[comment:node:title]"
-
-  ----
-  [comment:title]
-  [comment:body]
-  ----
-
-  You can view the comment at the following url
-  [comment:url]
-
-  You will receive emails like this for all replies to your posts. You can
-  disable this by logging in and changing the settings on your user account at
-  [comment:node:author:edit-url].
-
-  -- [site:name] team
-  [site:url]
-default_registered_mailalert: none
-node_notify_default_mailalert: false
-watcher_subject: '[site:name] :: new comment on [comment:node:title]'
-comment_notify_default_mailtext: |
-  Hi [comment-subscribed:author],
-
-  [comment:author] has commented on: "[comment:node:title]"
-
-  ----
-  [comment:title]
-  [comment:body]
-  ----
-
-  You can view the comment at the following url
-  [comment:url]
-
-  You can stop receiving emails when someone replies to this post,
-  by going to [comment-subscribed:unsubscribe-url]
-
-  You can set up auto-following feature for all future posts
-  by creating your own user with a few clicks here [site:login-url]
-
-  -- [site:name] team
-  [site:url]
-node_types:
-  - article
+enable_default:
+  watcher: none
+  entity_author: false
 errors:
   anonymous_email_missing: 'If you want to subscribe to comments you must supply a valid e-mail address.'
+mail_templates:
+  watcher:
+    subject: '[site:name] :: new comment on [comment:node:title]'
+    body: |
+      Hi [comment-subscribed:author],
+
+      [comment:author] has commented on: "[comment:node:title]"
+
+      ----
+      [comment:title]
+      [comment:body]
+      ----
+
+      You can view the comment at the following url
+      [comment:url]
+
+      You can stop receiving emails when someone replies to this post,
+      by going to [comment-subscribed:unsubscribe-url]
+
+      You can set up auto-following feature for all future posts
+      by creating your own user with a few clicks here [site:login-url]
+
+      -- [site:name] team
+      [site:url]
+  entity_author:
+    subject: '[site:name] :: new comment for your post'
+    body: |
+      Hi [comment:node:author],
+
+      You have received a comment on: "[comment:node:title]"
+
+      ----
+      [comment:title]
+      [comment:body]
+      ----
+
+      You can view the comment at the following url
+      [comment:url]
+
+      You will receive emails like this for all replies to your posts. You can
+      disable this by logging in and changing the settings on your user account at
+      [comment:node:author:edit-url].
+
+      -- [site:name] team
+      [site:url]

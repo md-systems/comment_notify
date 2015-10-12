@@ -82,34 +82,42 @@ class CommentNotifySettings extends ConfigFormBase {
 
     $available_options[COMMENT_NOTIFY_DISABLED] = $this->t('No notifications');
     $available_options += _comment_notify_options();
-    $form['default_anon_mailalert'] = [
+
+    $form['enable_default'] = [
+      '#type' => 'container',
+      '#tree' => TRUE,
+    ];
+
+    $form['enable_default']['watcher'] = [
       '#type' => 'select',
-      '#title' => $this->t('Default state for the notification selection box for anonymous users'),
+      '#title' => $this->t('Default state for the notification selection box'),
       '#return_value' => 1,
-      '#default_value' => $config->get('default_anon_mailalert'),
+      '#default_value' => $config->get('enable_default.watcher'),
+      '#description' => $this->t('This flag presets the flag for the follow-up notification on the form that users will see when posting a comment'),
       '#options' => $available_options,
     ];
 
-    $form['default_registered_mailalert'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Default state for the notification selection box for registered users'),
-      '#return_value' => 1,
-      '#default_value' => $config->get('default_registered_mailalert'),
-      '#description' => $this->t('This flag presets the flag for the follow-up notification on the form that anon users will see when posting a comment'),
-      '#options' => $available_options,
-    ];
-
-    $form['node_notify_default_mailalert'] = [
+    $form['enable_default']['entity_author'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Subscribe users to their node follow-up notification emails by default'),
-      '#default_value' => $config->get('node_notify_default_mailalert'),
+      '#default_value' => $config->get('enable_default.entity_author'),
       '#description' => $this->t('If this is checked, new users will receive e-mail notifications for follow-ups on their nodes by default until they individually disable the feature.'),
     ];
 
-    $form['comment_notify_default_mailtext'] = [
+    $form['mail_templates'] = [
+      '#type' => 'container',
+      '#tree' => TRUE,
+    ];
+
+    $form['mail_templates']['watcher'] = [
+      '#type' => 'container',
+      '#tree' => TRUE,
+    ];
+
+    $form['mail_templates']['watcher']['body'] = [
       '#type' => 'textarea',
       '#title' => $this->t('Default mail text for sending out notifications to commenters'),
-      '#default_value' => $config->get('comment_notify_default_mailtext'),
+      '#default_value' => $config->get('mail_templates.watcher.body'),
       '#cols' => 80,
       '#rows' => 15,
       '#token_types' => [
@@ -118,10 +126,15 @@ class CommentNotifySettings extends ConfigFormBase {
       '#element_validate' => ['token_element_validate'],
     ];
 
-    $form['node_notify_default_mailtext'] = [
+    $form['mail_templates']['entity_author'] = [
+      '#type' => 'container',
+      '#tree' => TRUE,
+    ];
+
+    $form['mail_templates']['entity_author']['body'] = [
       '#type' => 'textarea',
       '#title' => $this->t('Default mail text for sending out the notifications to node authors'),
-      '#default_value' => $config->get('node_notify_default_mailtext'),
+      '#default_value' => $config->get('mail_templates.entity_author.body'),
       '#cols' => 80,
       '#rows' => 15,
       '#token_types' => [

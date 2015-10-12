@@ -22,8 +22,8 @@ function comment_notify_get_user_notification_setting($uid) {
     // Handle anonymous users with defaults.
     if ($uid == 0) {
       $users[0] = new stdClass();
-      $users[0]->comment_notify = \Drupal::config('comment_notify.settings')->get('default_registered_mailalert');
-      $users[0]->node_notify = \Drupal::config('comment_notify.settings')->get('node_notify_default_mailalert');
+      $users[0]->comment_notify = \Drupal::config('comment_notify.settings')->get('enable_default.watcher');
+      $users[0]->node_notify = \Drupal::config('comment_notify.settings')->get('enable_default.entity_author');
     }
     else {
       $setting = db_select('comment_notify_user_settings', 'cnus')
@@ -45,8 +45,8 @@ function comment_notify_get_user_notification_setting($uid) {
 
 function comment_notify_get_default_notification_setting() {
   return (object) array(
-    'comment_notify' => \Drupal::config('comment_notify.settings')->get('default_registered_mailalert'),
-    'node_notify' => \Drupal::config('comment_notify.settings')->get('node_notify_default_mailalert')
+    'comment_notify' => \Drupal::config('comment_notify.settings')->get('enable_default.watcher'),
+    'node_notify' => \Drupal::config('comment_notify.settings')->get('enable_default.entity_author')
   );
 }
 

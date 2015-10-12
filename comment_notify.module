@@ -120,7 +120,7 @@ function comment_notify_form_comment_form_alter(&$form, &$form_state, $form_id) 
 // Could not extract the default value because it is either indeterminate, or
 // not scalar. You'll need to provide a default value in
 // config/install/comment_notify.settings.yml and config/schema/comment_notify.schema.yml.
-$enabled_types = \Drupal::config('comment_notify.settings')->get('comment_notify_node_types');
+$enabled_types = \Drupal::config('comment_notify.settings')->get('node_types');
   if (empty($enabled_types[$node->type])) {
     return;
   }
@@ -356,7 +356,7 @@ function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface 
     $form['comment_notify_settings']['node_notify'] = array(
       '#type' => 'checkbox',
       '#title' => t('Receive content follow-up notification e-mails'),
-      '#default_value' => isset($node_notify) ? $node_notify : \Drupal::config('comment_notify.settings')->get('node_notify_default_mailalert'),
+      '#default_value' => isset($node_notify) ? $node_notify : \Drupal::config('comment_notify.settings')->get('enable_default.entity_author'),
       '#description' => t('Check this box to receive an e-mail notification for follow-ups on your content. You can not disable notifications for individual threads.')
     );
   }
@@ -372,7 +372,7 @@ function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface 
   $form['comment_notify_settings']['comment_notify'] = array(
     '#type' => 'select',
     '#title' => t('Receive comment follow-up notification e-mails'),
-    '#default_value' => isset($comment_notify) ? array($comment_notify) : array(\Drupal::config('comment_notify.settings')->get('default_registered_mailalert')),
+    '#default_value' => isset($comment_notify) ? array($comment_notify) : array(\Drupal::config('comment_notify.settings')->get('enable_default.watcher')),
     '#options' => $available_options,
     '#description' => t("Check this box to receive e-mail notification for follow-up comments to comments you posted. You can later disable this on a post-by-post basis... so if you leave this to YES, you can still disable follow-up notifications for comments you don't want follow-up mails anymore - i.e. for very popular posts.")
   );
@@ -470,7 +470,7 @@ function _comment_notify_mailalert(CommentInterface $comment) {
   $node = \Drupal::entityManager()->getStorage('node')->load($nid);
 
   // No mails if this is not an enabled content type.
-  $enabled_types = $config->get('comment_notify_node_types') ?: [$node->getEntityTypeId()];
+  $enabled_types = $config->get('node_types') ?: [$node->getEntityTypeId()];
   if (empty($enabled_types[$node->getEntityTypeId()])) {
     return;
   }
@@ -492,7 +492,7 @@ function _comment_notify_mailalert(CommentInterface $comment) {
   if (
     (
       (!empty($author->comment_notify_settings->node_notify) && $author->comment_notify_settings->node_notify == 1)
-      || ($config->get('node_notify_default_mailalert') == 1 && !isset($author->comment_notify_settings->node_notify))
+      || ($config->get('enable_default.entity_author') == 1 && !isset($author->comment_notify_settings->node_notify))
     )
     && $user->id() != $author->id()
     && $node->access('view', $author)
@@ -501,8 +501,8 @@ function _comment_notify_mailalert(CommentInterface $comment) {
     // Get the author's language.
     $language = $author->getPreferredLangcode();
     $raw_values = array(
-      'subject' => $config->get('author_subject'),
-      'body'  => $config->get('node_notify_default_mailtext'), //JS @todo:change this.
+      'subject' => $config->get('mail_templates.entity_author.subject'),
+      'body'  => $config->get('mail_templates.entity_author.body'),
     );
     foreach ($raw_values as $k => $v) {
       $message[$k] = \Drupal::token()->replace(t($v), array('comment' => $comment), array('sanitize' => FALSE));
@@ -540,8 +540,8 @@ function _comment_notify_mailalert(CommentInterface $comment) {
       }
 
       $raw_values = array(
-        'subject' => $config->get('watcher_subject'),
-        'body'  => $config->get('comment_notify_default_mailtext'), //JS @todo:change this var name.
+        'subject' => $config->get('mail_templates.watcher.subject'),
+        'body'  => $config->get('mail_templates.watcher.body'),
       );
 
       foreach ($raw_values as $k => $v) {
