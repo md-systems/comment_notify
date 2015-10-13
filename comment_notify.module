@@ -288,7 +288,7 @@ function comment_notify_comment_insert(\Drupal\comment\CommentInterface $comment
   // The string is built with token and their host and comment identifier.
   // It is stored and referenced, we really just need something unique/unguessable.
   $hostname = !$comment->getHostname() ? $comment->getHostname() : (isset($user->hostname) ? $user->hostname : '');
-  $notify_hash = drupal_get_token($hostname . $comment->id());
+  $notify_hash = \Drupal::csrfToken()->get($hostname . $comment->id());
 
   if (!empty($comment->notify)) {
     $notify = $comment->notify_type;
