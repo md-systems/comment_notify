@@ -32,39 +32,7 @@ function comment_notify_install() {
  * Implements hook_schema().
  */
 function comment_notify_schema() {
-  $schema['comment_notify'] = array(
-    'description' => t('Stores information about which commenters on the site have subscriped to followup emails.'),
-    'fields' => array(
-      'cid' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'description' => 'The comment id from {comments}.cid',
-        'not null' => TRUE,
-        'disp-width' => '11'),
-      'notify' => array(
-        'type' => 'int',
-        'description' => 'An integer indicating the type of subscription: 0 means not subscribed, 1 means subscribed to all comments, and 2 means only subscribed to replies of this comment.',
-        'size' => 'tiny',
-        'not null' => TRUE,
-        'disp-width' => '11'),
-      'notify_hash' => array(
-        'type' => 'varchar',
-        'description' => 'A hash of unique information about the commenter.  Used for unsubscribing users.',
-        'length' => '128',
-        'not null' => TRUE,
-        'default' => ''),
-      'notified' => array(
-        'type' => 'int',
-        'description' => 'A boolean indicator for whether or not a notification for the comment has been sent: 1 means yes, 0 means no.',
-        'size' => 'tiny',
-        'not null' => TRUE,
-        'default' => 0,
-        'disp-width' => '11'),
-    ),
-    'primary key' => array('cid'),
-    'indexes' => array(
-      'notify_hash' => array('notify_hash')),
-  );
+  // @todo Create @FieldType NotifyPreferencesItem to store these preferences as a User field.
   $schema['comment_notify_user_settings'] = array(
     'fields' => array(
         'uid' => array(

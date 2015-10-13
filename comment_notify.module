@@ -16,7 +16,18 @@ define('COMMENT_NOTIFY_DISABLED', 'none');
 define('COMMENT_NOTIFY_NODE', 'node');
 define('COMMENT_NOTIFY_COMMENT', 'comment');
 
-
+/**
+ * Maps integers to notification type names.
+ *
+ * @return array
+ */
+function comment_notify_types() {
+  return [
+    COMMENT_NOTIFY_DISABLED,
+    COMMENT_NOTIFY_NODE,
+    COMMENT_NOTIFY_COMMENT,
+  ];
+}
 //define('AUTHOR_MAILTEXT',
 //'Hi [comment:node:author],
 //
@@ -106,64 +117,6 @@ function _comment_notify_options() {
   $available_options = array_intersect_key($total_options, $selected_options);
 
   return $available_options;
-}
-
-
-function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form_state, $form_id) {
-  $user = \Drupal::currentUser();
-  if (!(\Drupal::currentUser()->hasPermission('subscribe to comments') || \Drupal::currentUser()->hasPermission('administer comments'))) {
-    return;
-  }
-
-  /** @var \Drupal\Core\Entity\EntityInterface $commented_entity */
-  $commented_entity = $form_state->getFormObject()->getEntity()->getCommentedEntity();
-
-  // Only add the checkbox if this is an enabled content type
-  $enabled_types = \Drupal::config('comment_notify.settings')->get('node_types');
-  if (!in_array($commented_entity->bundle(), $enabled_types)) {
-    return;
-  }
-
-  $available_options = _comment_notify_options();
-  // Add the checkbox for anonymous users.
-  if ($user->isAnonymous()) {
-    // If anonymous users can't enter their e-mail don't tempt them with the checkbox.
-    if (empty($form['author']['mail'])) {
-      return;
-    }
-    $form['#validate'][] = 'comment_notify_comment_validate';
-  }
-  module_load_include('inc', 'comment_notify', 'comment_notify');
-  $preference = comment_notify_get_user_comment_notify_preference($user->id());
-
-  // If you want to hide this on your site see http://drupal.org/node/322482
-  $form['notify_settings']['notify'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Notify me when new comments are posted'),
-    '#default_value' => (bool) $preference,
-  );
-
-  $form['notify_settings']['notify_type'] = array(
-    '#type' => 'radios',
-    '#options' => $available_options,
-    '#default_value' => $preference ? $preference : 1,
-  );
-  if (count($available_options) == 1) {
-    $form['notify_settings']['notify_type']['#type'] = 'hidden';
-    $form['notify_settings']['notify_type']['#value'] = key($available_options);
-  }
-
-  // If this is an existing comment we set the default value based on their selection last time.
-  if ($form['cid']['#value'] != '') {
-    $notify = comment_notify_get_notification_type($form['cid']['#value']);
-    $form['notify_settings']['notify']['#default_value'] = (bool) $notify;
-    if (count($available_options) > 1) {
-      $form['notify_settings']['notify_type']['#default_value'] = empty($notify) ? COMMENT_NOTIFY_NODE : $notify;
-    }
-    else {
-      $form['notify_settings']['notify_type']['#default_value'] = key($available_options);
-    }
-  }
 }
 
 /**
