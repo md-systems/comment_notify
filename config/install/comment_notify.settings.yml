@@ -1,8 +1,8 @@
 node_types:
   - article
 available_alerts:
-  node: true
-  comment: true
+  1: true
+  2: true
 enable_default:
   watcher: none
   entity_author: false

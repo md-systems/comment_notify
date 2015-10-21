@@ -10,9 +10,11 @@ comment_notify.settings:
       type: mapping
       label: Available subscription modes
       mapping:
-        node:
+        # COMMENT_NOTIFY_NODE
+        1:
           type: boolean
-        comment:
+        # COMMENT_NOTIFY_COMMENT
+        2:
           type: boolean
     enable_default:
       type: mapping

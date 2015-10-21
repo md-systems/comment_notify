@@ -10,22 +10,23 @@
 function comment_notify_install() {
 
   // Create entries for existing comments.
-  // @todo D8: Let's see if we can do without this.
-//  $comments_select = db_select('comment', 'c');
-//  $comments_select->join('users', 'u', 'c.uid = u.uid');
-//  $comments_select->addField('c', 'cid');
-//  $comments_select->addExpression('0', 'notify');
-//  // Mix in a random string to all values.
-//  $salt = uniqid(mt_rand(), TRUE);
-//  if (db_driver() == 'pgsql') {
-//    $comments_select->addExpression("MD5(:salt || c.mail || COALESCE(u.mail, u.init) || c.uid || c.name || c.nid || c.hostname || c.cid)", 'notify_hash', array(':salt' => $salt));
-//  }
-//  else {
-//    $comments_select->addExpression("MD5(CONCAT(:salt, c.mail, COALESCE(u.mail, u.init), c.uid, c.name, c.nid, c.hostname, c.cid))", 'notify_hash', array(':salt' => $salt));
-//  }
-//
-//  // Set module weight low so that other modules act on the comment first.
-//  db_insert('comment_notify')->from($comments_select)->execute();
+  $comments_select = db_select('comment_field_data', 'c');
+  $comments_select->join('users_field_data', 'u', 'c.uid = u.uid');
+  $comments_select->addField('c', 'cid');
+  $comments_select->addExpression('0', 'notify');
+  // Mix in a random string to all values.
+  $salt = uniqid(mt_rand(), TRUE);
+  if (db_driver() == 'pgsql') {
+    $comments_select->addExpression("MD5(:salt || c.mail || COALESCE(u.mail, u.init) || c.uid || c.name || c.entity_id || c.hostname || c.cid)", 'notify_hash', array(':salt' => $salt));
+  }
+  else {
+    $comments_select->addExpression("MD5(CONCAT_WS('', :salt, c.mail, COALESCE(u.mail, u.init), c.uid, c.name, c.entity_id, c.hostname, c.cid))", 'notify_hash', array(':salt' => $salt));
+  }
+
+  \Drupal::logger('the_shit')->debug((string) $comments_select);
+
+  // Set module weight low so that other modules act on the comment first.
+  db_insert('comment_notify')->from($comments_select)->execute();
 }
 
 /**

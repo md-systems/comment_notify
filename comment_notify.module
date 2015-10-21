@@ -12,10 +12,9 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageInterface;
 
-define('COMMENT_NOTIFY_DISABLED', 'none');
-define('COMMENT_NOTIFY_NODE', 'node');
-define('COMMENT_NOTIFY_COMMENT', 'comment');
-
+define('COMMENT_NOTIFY_DISABLED', 0);
+define('COMMENT_NOTIFY_NODE', 1);
+define('COMMENT_NOTIFY_COMMENT', 2);
 
 //define('AUTHOR_MAILTEXT',
 //'Hi [comment:node:author],
@@ -154,8 +153,10 @@ function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form
   }
 
   // If this is an existing comment we set the default value based on their selection last time.
-  if ($form['cid']['#value'] != '') {
-    $notify = comment_notify_get_notification_type($form['cid']['#value']);
+  /** @var \Drupal\comment\CommentInterface $comment */
+  $comment = $form_state->getFormObject()->getEntity();
+  if (!$comment->isNew()) {
+    $notify = comment_notify_get_notification_type($comment->id());
     $form['notify_settings']['notify']['#default_value'] = (bool) $notify;
     if (count($available_options) > 1) {
       $form['notify_settings']['notify_type']['#default_value'] = empty($notify) ? COMMENT_NOTIFY_NODE : $notify;
@@ -266,10 +267,10 @@ function comment_notify_comment_update($comment) {
   }
   // In case they have changed their status, save it in the database.
   if (isset($status)) {
-    comment_notify_update_notification($comment->cid, $status);
+    comment_notify_update_notification($comment->id(), $status);
   }
   // And send notifications - the real purpose of the module.
-  if ($comment->status == COMMENT_PUBLISHED) {
+  if ($comment->status == CommentInterface::PUBLISHED) {
     _comment_notify_mailalert($comment);
   }
 
@@ -305,7 +306,7 @@ function comment_notify_comment_insert(\Drupal\comment\CommentInterface $comment
   comment_notify_add_notification($comment->id(), $notify, $notify_hash);
 
   // And send notifications - the real purpose of the module.
-  if ($comment->isPublished() == COMMENT_PUBLISHED) {
+  if ($comment->isPublished() == CommentInterface::PUBLISHED) {
     _comment_notify_mailalert($comment);
   }
 }
@@ -425,8 +426,8 @@ function comment_notify_user_cancel($edit, $account, $method) {
 function comment_notify_comment_load($comments) {
   // Load some comment_notify specific information into the comment object.
   $query = db_select('comment_notify', 'cn');
-  $query->join('comment', 'c', 'c.cid = cn.cid');
-  $query->leftJoin('users', 'u', 'c.uid = u.uid');
+  $query->join('comment_field_data', 'c', 'c.cid = cn.cid');
+  $query->leftJoin('users_field_data', 'u', 'c.uid = u.uid');
   $query->condition('c.cid', array_keys($comments));
   $query->fields('cn', array('cid', 'notify', 'notify_hash', 'notified'));
   $query->addField('c', 'mail', 'cmail');

@@ -87,7 +87,7 @@ class CommentNotifyTest extends WebTestBase {
     $this->assertMail('to', $contact_1['mail'], t('Message was sent to the proper anonymous user.'));
 
     // Notify type 0 (i.e. only one mode is enabled).
-    \Drupal::configFactory()->getEditable('comment_notify.settings')->set('available_alerts', ['node' => FALSE, 'comment' => TRUE])->save();
+    \Drupal::configFactory()->getEditable('comment_notify.settings')->set('available_alerts', [1 => FALSE, 2 => TRUE])->save();
     $subscribe_0 = array('notify' => TRUE);
     $contact_0 = array('mail' => $this->getRandomEmailAddress());
     $anonymous_comment_0 = $this->postCommentNotifyComment($node, $this->randomMachineName(), $this->randomMachineName(), $subscribe_0, $contact_0);
