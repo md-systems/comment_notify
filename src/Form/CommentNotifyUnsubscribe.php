@@ -7,11 +7,19 @@
 
 namespace Drupal\comment_notify\Form;
 
+use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 
-class CommentNotifyUnsubscribe extends FormBase {
+class CommentNotifyUnsubscribe extends ConfigFormBase {
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames() {
+    return [];
+  }
 
   /**
    * {@inheritdoc}
@@ -22,9 +30,11 @@ class CommentNotifyUnsubscribe extends FormBase {
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
     $form['comment_notify_unsubscribe'] = [];
+
     $form['comment_notify_unsubscribe']['email_to_unsubscribe'] = [
       '#type' => 'textfield',
       '#title' => t('Email to unsubscribe'),
+      '#required' => TRUE,
     ];
     $form['comment_notify_unsubscribe']['submit'] = [
       '#type' => 'submit',
