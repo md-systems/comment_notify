@@ -440,7 +440,7 @@ function comment_notify_comment_load($comments) {
   $query = db_select('comment_notify', 'cn');
   $query->join('comment_field_data', 'c', 'c.cid = cn.cid');
   $query->leftJoin('users_field_data', 'u', 'c.uid = u.uid');
-  $query->condition('c.cid', array_keys($comments));
+  $query->condition('c.cid', array_keys($comments), 'IN');
   $query->fields('cn', array('cid', 'notify', 'notify_hash', 'notified'));
   $query->addField('c', 'mail', 'cmail');
   $query->addField('u', 'init', 'uinit');
@@ -483,16 +483,17 @@ function _comment_notify_mailalert(CommentInterface $comment) {
 
   // No mails if this is not an enabled content type.
   $enabled_types = $config->get('node_types') ?: [$node->getEntityTypeId()];
-  if (empty($enabled_types[$node->getEntityTypeId()])) {
+  if (!in_array($node->bundle(), $enabled_types)) {
     return;
   }
 
-  if (empty($comment->mail)) {
+  if (empty($comment->getAuthorEmail())) {
+    /** @var \Drupal\user\UserInterface $comment_account */
     $comment_account = user_load_by_name($comment->getAuthorName());
-    $comment_mail = isset($comment_account->mail) ? $comment_account->mail : '';
+    $comment_mail = $comment_account->getEmail() ?: '';
   }
   else {
-    $comment_mail = $comment->mail;
+    $comment_mail = $comment->getAuthorEmail();
   }
   $sent_to = array();
 
@@ -624,18 +625,20 @@ function comment_notify_unsubscribe_submit($form, &$form_state) {
 /**
  * Get the unsubscribe link for a comment subscriber.
  *
- * @param $comment
+ * @param \Drupal\comment\CommentInterface $comment
  *   The subscribed comment object.
  *
- * @return
- *   A string with the internal path to the unsubscribe link, ready to be
- *   passed to the url() function.
+ * @return \Drupal\Core\Url|null
+ *   A Url object for the unsubscribe page, or NULL if the comment is missing a
+ *   notification hash.
+ *
+ * @todo In what case would a comment be missing its notification hash?
  */
-function comment_notify_get_unsubscribe_url($comment) {
-  module_load_include('inc', 'comment_notify', 'comment_notify');
+function comment_notify_get_unsubscribe_url(CommentInterface $comment) {
   if (!empty($comment->notify_hash)) {
-    return 'comment_notify/disable/' . $comment->notify_hash;
+    return \Drupal::url('comment_notify.disable_page', ['hash' => $comment->notify_hash]);
   }
+  return NULL;
 }
 /**
  * Implements hook_field_extra_fields().

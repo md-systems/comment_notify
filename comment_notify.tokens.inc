@@ -4,6 +4,7 @@
  * @file
  * Builds placeholder replacement tokens for comment_notify.module.
  */
+use Drupal\Core\Render\BubbleableMetadata;
 
 /**
  * Implements hook_token_info().
@@ -29,7 +30,7 @@ function comment_notify_token_info() {
 /**
  * Implements hook_tokens().
  */
-function comment_notify_tokens($type, $tokens, array $data = array(), array $options = array()) {
+function comment_notify_tokens($type, $tokens, array $data = array(), array $options = array(), BubbleableMetadata $bubbleable_metadata) {
   $url_options = array('absolute' => TRUE);
   if (isset($options['language'])) {
     $url_options['language'] = $options['language'];
@@ -49,10 +50,7 @@ function comment_notify_tokens($type, $tokens, array $data = array(), array $opt
       switch ($name) {
         case 'unsubscribe-url':
           if ($unsubscribe_url = comment_notify_get_unsubscribe_url($comment)) {
-            // @FIXME
-// url() expects a route name or an external URI.
-// $replacements[$original] = url($unsubscribe_url, $url_options);
-
+            $replacements[$original] = $unsubscribe_url;
           }
           break;
       }
@@ -60,13 +58,13 @@ function comment_notify_tokens($type, $tokens, array $data = array(), array $opt
 
     // [comment:unsubscribe-url:*] chained token replacements.
     if (($unsubscribe_url_tokens = \Drupal::token()->findWithPrefix($tokens, 'unsubscribe-url')) && $unsubscribe_url = comment_notify_get_unsubscribe_url($comment)) {
-      $replacements += \Drupal::token()->generate('url', $unsubscribe_url_tokens, array('path' => $unsubscribe_url), $options);
+      $replacements += \Drupal::token()->generate('url', $unsubscribe_url_tokens, array('path' => $unsubscribe_url), $options, $bubbleable_metadata);
     }
   }
 
   // Comment subscriber tokens (pass through to comment token replacement).
   if ($type == 'comment-subscribed' && !empty($data['comment-subscribed'])) {
-    $replacements += \Drupal::token()->generate('comment', $tokens, array('comment' => $data['comment-subscribed']), $options);
+    $replacements += \Drupal::token()->generate('comment', $tokens, array('comment' => $data['comment-subscribed']), $options, $bubbleable_metadata);
   }
 
   return $replacements;

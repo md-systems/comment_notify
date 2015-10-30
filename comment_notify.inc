@@ -193,7 +193,7 @@ function comment_notify_get_notification_type($cid) {
  *   A list of comment entities.
  */
 function comment_notify_get_watchers($nid) {
-  $cids = db_query("SELECT c.cid FROM {comment} c INNER JOIN {comment_notify} cn ON c.cid = cn.cid LEFT JOIN {users} u ON c.uid = u.uid WHERE c.nid = :nid AND c.status = :status AND cn.notify <> :notify AND (u.uid = 0 OR u.status = 1)", array(
+  $cids = db_query("SELECT c.cid FROM {comment_field_data} c INNER JOIN {comment_notify} cn ON c.cid = cn.cid LEFT JOIN {users_field_data} u ON c.uid = u.uid WHERE c.entity_id = :nid AND c.status = :status AND cn.notify <> :notify AND (u.uid = 0 OR u.status = 1)", array(
     ':nid' => $nid,
     ':status' => CommentInterface::PUBLISHED,
     ':notify' => COMMENT_NOTIFY_DISABLED,
@@ -216,7 +216,7 @@ function comment_notify_mark_comment_as_notified($comment) {
     ->fields(array(
       'notified' => 1,
     ))
-    ->condition('cid', $comment->cid)
+    ->condition('cid', $comment->id())
     ->execute();
 }
 
