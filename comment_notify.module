@@ -12,6 +12,8 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\node\Entity\NodeType;
 use Drupal\user\UserInterface;
 
 define('COMMENT_NOTIFY_DISABLED', 0);
@@ -115,20 +117,20 @@ function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form
   $preference = comment_notify_get_user_comment_notify_preference($user->id());
 
   // If you want to hide this on your site see http://drupal.org/node/322482
-  $form['notify_settings']['notify'] = array(
+  $form['comment_notify_settings']['notify'] = array(
     '#type' => 'checkbox',
     '#title' => t('Notify me when new comments are posted'),
     '#default_value' => (bool) $preference,
   );
 
-  $form['notify_settings']['notify_type'] = array(
+  $form['comment_notify_settings']['notify_type'] = array(
     '#type' => 'radios',
     '#options' => $available_options,
     '#default_value' => $preference ? $preference : 1,
   );
   if (count($available_options) == 1) {
-    $form['notify_settings']['notify_type']['#type'] = 'hidden';
-    $form['notify_settings']['notify_type']['#value'] = key($available_options);
+    $form['comment_notify_settings']['notify_type']['#type'] = 'hidden';
+    $form['comment_notify_settings']['notify_type']['#value'] = key($available_options);
   }
 
   // If this is an existing comment we set the default value based on their selection last time.
@@ -136,12 +138,12 @@ function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form
   $comment = $form_state->getFormObject()->getEntity();
   if (!$comment->isNew()) {
     $notify = comment_notify_get_notification_type($comment->id());
-    $form['notify_settings']['notify']['#default_value'] = (bool) $notify;
+    $form['comment_notify_settings']['notify']['#default_value'] = (bool) $notify;
     if (count($available_options) > 1) {
-      $form['notify_settings']['notify_type']['#default_value'] = empty($notify) ? COMMENT_NOTIFY_NODE : $notify;
+      $form['comment_notify_settings']['notify_type']['#default_value'] = empty($notify) ? COMMENT_NOTIFY_NODE : $notify;
     }
     else {
-      $form['notify_settings']['notify_type']['#default_value'] = key($available_options);
+      $form['comment_notify_settings']['notify_type']['#default_value'] = key($available_options);
     }
   }
 
@@ -617,15 +619,17 @@ function comment_notify_get_unsubscribe_url(CommentInterface $comment) {
 /**
  * Implements hook_field_extra_fields().
  */
-function comment_notify_field_extra_fields() {
+function comment_notify_entity_extra_field_info() {
   module_load_include('inc', 'comment_notify', 'comment_notify');
   $extras = array();
 
   foreach (\Drupal::config('comment_notify.settings')->get('node_types') as $node_type) {
-    if (isset($node_type)) {
-      $extras['comment']['comment_node_' . $node_type]['form']['comment_notify_settings'] = array(
+    $comment_field = FieldConfig::loadByName('node', $node_type, 'comment');
+    if ($comment_field) {
+      $comment_type = $comment_field->getSetting('comment_type');
+      $extras['comment'][$comment_type]['form']['comment_notify_settings'] = array(
         'label' => t('Comment Notify settings'),
-        'description' => t('@node_type settings for Comment Notify', array('@node_type' => ucwords($node_type))),
+        'description' => t('@node_type settings for Comment Notify', array('@node_type' => NodeType::load($node_type)->label())),
         'weight' => 1,
       );
     }
