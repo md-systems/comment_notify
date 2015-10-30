@@ -18,49 +18,6 @@ define('COMMENT_NOTIFY_DISABLED', 0);
 define('COMMENT_NOTIFY_NODE', 1);
 define('COMMENT_NOTIFY_COMMENT', 2);
 
-//define('AUTHOR_MAILTEXT',
-//'Hi [comment:node:author],
-//
-//You have received a comment on: "[comment:node:title]"
-//
-//----
-//[comment:title]
-//[comment:body]
-//----
-//
-//You can view the comment at the following url
-//[comment:url]
-//
-//You will receive emails like this for all replies to your posts. You can
-//disable this by logging in and changing the settings on your user account at
-//[comment:node:author:edit-url].
-//
-//-- [site:name] team
-//[site:url]');
-
-//define('DEFAULT_MAILTEXT',
-//'Hi [comment-subscribed:author],
-//
-//[comment:author] has commented on: "[comment:node:title]"
-//
-//----
-//[comment:title]
-//[comment:body]
-//----
-//
-//You can view the comment at the following url
-//[comment:url]
-//
-//You can stop receiving emails when someone replies to this post,
-//by going to [comment-subscribed:unsubscribe-url]
-//
-//You can set up auto-following feature for all future posts
-//by creating your own user with a few clicks here [site:login-url]
-//
-//-- [site:name] team
-//[site:url]');
-
-
 /**
  * Implements hook_page_attachments().
  */
@@ -155,77 +112,6 @@ function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form
 function _comment_notify_form_build_comment_entity($entity_type_id, EntityInterface $entity, array &$form, FormStateInterface $form_state) {
   $entity->notify = $form_state->getValue('notify');
   $entity->notify_type = $form_state->getValue('notify_type');
-}
-
-/**
- * Implements hook_permission().
- */
-function comment_notify_permission() {
-  return array(
-    'administer comment notify' => array(
-      'title' => 'Administer Comment Notify',
-      'description' => 'Change global comment notification settings.',
-  ),
-    'subscribe to comments' => array(
-      'title' => 'Subscribe to comment notifications',
-      'description' => 'Subscribe to recieve notifications when new comments are posted.',
-  ),
-  );
-}
-
-/**
- * Implements hook_menu().
- */
-function comment_notify_menu() {
-
-  $items['admin/config/people/comment_notify'] = array(
-    'title' => 'Comment Notify',
-    'description' => 'Configure settings for e-mails about new comments.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('comment_notify_settings'),
-    'access arguments' => array('administer comment notify'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-  $items['admin/config/people/comment_notify/settings'] = array(
-    'title' => 'Settings',
-    'description' => 'Configure settings for e-mails about new comments.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('comment_notify_settings'),
-    'access arguments' => array('administer comment notify'),
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
-
-  $items['admin/config/people/comment_notify/unsubscribe'] = array(
-    'title' => 'Unsubscribe',
-    'description' => 'Unsubscribe an email from all notifications.',
-    'weight' => 2,
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('comment_notify_unsubscribe'),
-    'access arguments' => array('administer comment notify'),
-    'type' => MENU_LOCAL_TASK,
-  );
-  $items['comment_notify/disable/%'] = array(
-    'title' => 'Disable comment notification',
-    'page callback' => 'comment_notify_disable_page',
-    'page arguments' => array(2),
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK
-  );
-
-  return $items;
-}
-
-/**
- * Page callback to allow users to unsubscribe simply by visiting the page.
- */
-function comment_notify_disable_page($hash) {
-  module_load_include('inc', 'comment_notify', 'comment_notify');
-  if (comment_notify_unsubscribe_by_hash($hash)) {
-    return(t('Your comment follow-up notification for this post was disabled. Thanks.'));
-  }
-  else {
-    return(t('Sorry, there was a problem unsubscribing from notifications.'));
-  }
 }
 
 function comment_notify_comment_validate(&$form, FormStateInterface $form_state) {
@@ -561,39 +447,6 @@ function _comment_notify_mailalert(CommentInterface $comment) {
 function comment_notify_mail($key, &$message, $params) {
   $message['subject'] = $params['subject'];
   $message['body'][] = $params['body'];
-}
-
-/**
- * Callback for an administrative form to unsubscribe users by e-mail address.
- */
-function comment_notify_unsubscribe($form, &$form_state) {
-  $form['comment_notify_unsubscribe'] = array();
-  $form['comment_notify_unsubscribe']['email_to_unsubscribe'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Email to unsubscribe'),
-  );
-  $form['comment_notify_unsubscribe']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Unsubscribe this e-mail'),
-  );
-  return $form;
-}
-
-/**
- * Based on admin submit, do the actual unsubscribe from notifications.
- */
-function comment_notify_unsubscribe_submit($form, &$form_state) {
-  module_load_include('inc', 'comment_notify', 'comment_notify');
-  $email = trim($form_state['values']['email_to_unsubscribe']);
-  $comments = comment_notify_unsubscribe_by_email($email);
-  // Update the admin about the state of this comment notification subscription.
-  if ($comments == 0) {
-    drupal_set_message(t("There were no active comment notifications for that email."));
-  }
-  else {
-    drupal_set_message(\Drupal::translation()->formatPlural($comments, "Email unsubscribed from 1 comment notification.",
-      "Email unsubscribed from @count comment notifications."));
-  }
 }
 
 /**
