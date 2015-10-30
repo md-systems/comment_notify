@@ -9,6 +9,7 @@
 use Drupal\comment\CommentInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageInterface;
 
@@ -165,6 +166,17 @@ function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form
       $form['notify_settings']['notify_type']['#default_value'] = key($available_options);
     }
   }
+
+  // Make sure the notify pseudofields are included when the entity is built.
+  $form['#entity_builders'][] = '_comment_notify_form_build_comment_entity';
+}
+
+/**
+ * Entity builder for the comment form.
+ */
+function _comment_notify_form_build_comment_entity($entity_type_id, EntityInterface $entity, array &$form, FormStateInterface $form_state) {
+  $entity->notify = $form_state->getValue('notify');
+  $entity->notify_type = $form_state->getValue('notify_type');
 }
 
 /**
@@ -253,9 +265,9 @@ function comment_notify_comment_publish($comment) {
 }
 
 /**
- * Implements hook_comment_update().
+ * Implements hook_ENTITY_TYPE_update() for comment.
  */
-function comment_notify_comment_update($comment) {
+function comment_notify_comment_update(CommentInterface $comment) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
   // Take the status of the "notify" checkbox if they unchecked it.
@@ -270,7 +282,7 @@ function comment_notify_comment_update($comment) {
     comment_notify_update_notification($comment->id(), $status);
   }
   // And send notifications - the real purpose of the module.
-  if ($comment->status == CommentInterface::PUBLISHED) {
+  if ($comment->isPublished()) {
     _comment_notify_mailalert($comment);
   }
 
