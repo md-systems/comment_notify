@@ -1,0 +1,12 @@
+comment_notify:
+  version: 1.x
+  css:
+    theme:
+      comment_notify.css: {}
+
+comment_notify.type-selector:
+  version: 1.x
+  js:
+    comment_notify.js: {}
+  dependencies:
+    - core/jquery
