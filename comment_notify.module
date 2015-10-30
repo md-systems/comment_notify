@@ -12,6 +12,7 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\user\UserInterface;
 
 define('COMMENT_NOTIFY_DISABLED', 0);
 define('COMMENT_NOTIFY_NODE', 1);
@@ -312,30 +313,27 @@ function comment_notify_comment_delete(\Drupal\comment\CommentInterface $comment
 function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface &$form_state, $form_id) {
   module_load_include('inc', 'comment_notify', 'comment_notify');
 
-  if (!($form_id == 'user_register_form' || $form_id == 'user_profile_form')) {
-    return;
-  }
-  elseif ($form['#user_category'] != 'account') {
+  if (!($form_id == 'user_register_form' || $form_id == 'user_form')) {
     return;
   }
 
-  $user = $form['#user'];
+  $user = $form_state->getFormObject()->getEntity();
   if (!empty($user->comment_notify_settings)) {
     $node_notify = $user->comment_notify_settings->node_notify;
     $comment_notify = $user->comment_notify_settings->comment_notify;
   }
 
   $form['comment_notify_settings'] = array(
-    '#type' => 'fieldset',
+    '#type' => 'details',
     '#title' => t('Comment follow-up notification settings'),
     '#weight' => 4,
-    '#collapsible' => TRUE
+    '#open' => TRUE,
   );
 
   // Only show the node followup UI if the user has permission to create nodes.
   $nodes = FALSE;
   foreach (node_type_get_names() as $type => $name) {
-    if (node_access('create', $type)) {
+    if (\Drupal::entityManager()->getAccessControlHandler('node')->createAccess($type)) {
       $nodes = TRUE;
       break;
     }
@@ -365,31 +363,32 @@ function comment_notify_form_alter(&$form, \Drupal\Core\Form\FormStateInterface 
     '#options' => $available_options,
     '#description' => t("Check this box to receive e-mail notification for follow-up comments to comments you posted. You can later disable this on a post-by-post basis... so if you leave this to YES, you can still disable follow-up notifications for comments you don't want follow-up mails anymore - i.e. for very popular posts.")
   );
+
+  // Make sure the notify pseudofields are included when the entity is built.
+  $form['#entity_builders'][] = '_comment_notify_form_build_user_entity';
+
   return $form;
-  // Construct the user form
 }
 
 /**
- * @FIXME
- * The $edit and $category parameters are gone in Drupal 8. They have been left
- * here in order to prevent 'undefined variable' errors, but they will never
- * actually be passed to this hook. You'll need to modify this function and
- * remove every reference to them.
+ * Entity builder for the comment form.
  */
-function comment_notify_user_update(\Drupal\user\UserInterface $account, $category, $edit = NULL) {
-  if ($category != 'account') {
-    return;
-  }
-  if (isset($edit['node_notify']) && isset($edit['comment_notify'])) {
+function _comment_notify_form_build_user_entity($entity_type_id, EntityInterface $entity, array &$form, FormStateInterface $form_state) {
+  $entity->comment_notify_settings->node_notify = $form_state->getValue('node_notify');
+  $entity->comment_notify_settings->comment_notify = $form_state->getValue('comment_notify');
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update() for user.
+ */
+function comment_notify_user_update(UserInterface $account) {
+  if ($settings = $account->comment_notify_settings) {
     module_load_include('inc', 'comment_notify', 'comment_notify');
 
-    // Save the values of node_notify_mailalert and comment_notify_mailalert
-    // to {comment_notify_user_settings}.
-    comment_notify_set_user_notification_setting($account->id(), $edit['node_notify'], $edit['comment_notify']);
+    // Save the comment_notify_settings values to
+    // {comment_notify_user_settings}.
+    comment_notify_set_user_notification_setting($account->id(), $settings->node_notify, $settings->comment_notify);
   }
-  // Unset them from $user so they don't also get saved into {users}.data.
-  unset($edit['node_notify']);
-  unset($edit['comment_notify']);
 
 }
 
@@ -398,10 +397,8 @@ function comment_notify_user_load($users) {
 
   // @todo: Why would we want to load this on every user load?
   foreach ($users as &$user) {
-    $user->comment_notify_settings = comment_notify_get_user_notification_setting($user->id());
+    $user->comment_notify_settings = comment_notify_get_user_notification_setting($user->id()) ?: comment_notify_get_default_notification_setting();
   }
-
-  return;
 }
 
 function comment_notify_user_cancel($edit, $account, $method) {
