@@ -387,6 +387,10 @@ function comment_notify_user_update(UserInterface $account) {
   if ($settings = $account->comment_notify_settings) {
     module_load_include('inc', 'comment_notify', 'comment_notify');
 
+    if ($account->isAnonymous()) {
+      return;
+    }
+
     // Save the comment_notify_settings values to
     // {comment_notify_user_settings}.
     comment_notify_set_user_notification_setting($account->id(), $settings->node_notify, $settings->comment_notify);
